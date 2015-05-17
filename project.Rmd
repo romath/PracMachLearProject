@@ -1,0 +1,99 @@
+---
+title: '"Prediction algorithm to quantify correct form of doing: Unilateral Dumbbell Biceps Curl."'
+output: html_document
+---
+
+## Synopsis
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it.
+
+Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E). Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes.
+
+We will build a machine learning algorithm to predict the way ("clase" variable) in which they did the exercise.
+
+More information about the data is available from the website: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+## Basic settings
+
+We fixed a few basic settings to be used during this analysis. 
+```{r echo=TRUE, cache=TRUE, message=FALSE}
+setwd("~/Documents/ProgramsGitHub/PracMachLearProject")  # working directory
+library(caret)             # Machine Learning Tehcniques
+```
+
+## Data processing
+
+In this section we download the database that we are going to use and unzip it.
+
+```{r echo=TRUE, cache=TRUE, message=FALSE}
+trainUrl <-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+trainFile <- "./pml-training.csv"
+testFile  <- "./pml-testing.csv"
+if (!file.exists(trainFile) %in% dir()) {                        # existence of the data
+  download.file(trainUrl, destfile=trainFile, method="curl")
+}
+if (!file.exists(testFile) %in% dir() ) {                        # existence of the data
+  download.file(testUrl, destfile=testFile, method="curl")
+}
+```
+
+Next we load the data to the working enviroment.
+```{r echo=TRUE, cache=TRUE, message=FALSE}
+if ( !"training" %in% ls() ) {                           # existence of the data
+    training <- read.csv("pml-training.csv", sep = ",", na.strings = c("NA", "", " "))  
+}
+if ( !"testing" %in% ls() ) {                            # existence of the data
+    testing <- read.csv("pml-testing.csv", sep = ",", na.strings = c("NA", "", " ")) 
+}
+```
+
+The following code line shows few lines of the data (we don't print the outcome because it is too long) 
+```{r echo=TRUE, cache=TRUE, message=FALSE, results='hide'}
+head(training)
+```
+There are some variables with NA and the first 7 variables are not relevant for our prediction model.
+```{r echo=TRUE, cache=TRUE, message=FALSE}
+col <- (colSums(is.na(training))  == 0)
+training <- training[, col] 
+training = training[,-c(1:7)]
+testing <- testing[, col]                 # transformations used for training
+testing = testing[,-c(1:7)]
+```
+
+Now, we have 19622 observations witn 53 variables in the testing data set and 20 observations
+with the same number of variables in the training set (because we use the training cleaning transformations on the trainig set).
+```{r echo=TRUE, cache=TRUE, message=FALSE, results='hide'}
+dim(training)
+dim(testing)
+```
+
+## Data modeling
+
+We split the training set into a pure training data set (70%) and a validation data set (30%). We will use the validation data set to check estimated accuracy of the model and estimated out-of-sample error (cross validation).
+
+```{r echo=TRUE, cache=TRUE, message=FALSE}
+set.seed(22519) # For reproducibile purpose
+inTrain <- createDataPartition(training$classe, p=0.70, list=F)
+trainData <- training[inTrain, ]
+testData <- training[-inTrain, ]
+```
+
+We fit a predictive model using Random Forest algorithm because it gives estimates of what variables are important in the classification.
+
+```{r echo=TRUE, cache=TRUE, message=FALSE}
+modelRf <- train(classe ~ ., data=trainData, method="rf", ntree=250)
+modelRf
+```
+
+Now, we use our model on the validation data set:
+```{r echo=TRUE, cache=TRUE, message=FALSE}
+predictRf <- predict(modelRf, testData)
+```
+
+Finally, we estimate the performance:
+```{r echo=TRUE, cache=TRUE, message=FALSE}
+confusionMatrix(testData$classe, predictRf)
+```
+
+The estimated accuracy of the model is 99.34% and the estimated out-of-sample error is 0.66%.
